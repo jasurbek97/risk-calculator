@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Crypto Trade Risk Calculator</title>
+  <style>
+    :root{
+      --bg:#0b0d12; --panel:#121722; --muted:#778; --text:#e8ecf2; --accent:#6ee7b7; --accent2:#7aa2ff; --danger:#ff6b6b;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif;background:linear-gradient(180deg,#0b0d12,#0c1018 40%,#0b0d12);color:var(--text)}
+    .container{max-width:1100px;margin:40px auto;padding:24px}
+    .card{background:var(--panel);border:1px solid #1e2635;border-radius:18px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+    .header{display:flex;gap:16px;align-items:center;justify-content:space-between;padding:22px 22px 10px 22px}
+    .title{font-size:22px;font-weight:700;letter-spacing:.2px}
+    .grid{display:grid;gap:14px;padding:0 22px 22px 22px}
+    @media(min-width:900px){.grid{grid-template-columns:repeat(4,1fr)}}
+    label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+    input,textarea,button{font:inherit}
+    .input{width:100%;padding:12px 12px;border-radius:12px;border:1px solid #243047;background:#0f1320;color:var(--text)}
+    .row{display:flex;gap:10px;align-items:center}
+    .btn{cursor:pointer;border:1px solid #22304a;background:#0f1422;color:#dfe6f3;padding:10px 14px;border-radius:12px;transition:.15s ease;}
+    .btn:hover{transform:translateY(-1px);border-color:#2f436d}
+    .btn.accent{border-color:#1b3e36;background:#0f1f1a;color:#d8f5ea}
+    .btn.accent:hover{box-shadow:0 6px 20px rgba(110,231,183,.15)}
+    .btn.ghost{background:transparent}
+
+    table{width:100%;border-collapse:separate;border-spacing:0 10px}
+    th,td{padding:12px 14px;text-align:left}
+    th{font-size:12px;color:#9aa7c7;border-bottom:1px solid #23314c}
+    tr{background:#0f1422;border:1px solid #1d2740}
+    tr td:first-child, tr th:first-child{border-top-left-radius:12px;border-bottom-left-radius:12px}
+    tr td:last-child, tr th:last-child{border-top-right-radius:12px;border-bottom-right-radius:12px}
+
+    .pill{display:inline-block;padding:4px 10px;border-radius:999px;background:#0d192e;border:1px solid #22324f;color:#cfe}
+    .muted{color:#9aa7c7}
+    .foot{padding:12px 22px 22px 22px;color:#9aa7c7;font-size:12px}
+    .danger{color:var(--danger)}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <div class="header">
+        <div>
+          <div class="title">Crypto Trade Risk Calculator</div>
+          <div class="muted">Size positions by risk, not feelings. Set capital, entry, stop, and targets—get position size and P&L.</div>
+        </div>
+        <div class="row">
+          <button id="reset" class="btn ghost" title="Reset to defaults">Reset</button>
+          <button id="download" class="btn accent" title="Download table as CSV">Download CSV</button>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div>
+          <label for="capital">Capital (USDT)</label>
+          <input id="capital" type="number" class="input" value="5000" min="0" step="0.01">
+        </div>
+        <div>
+          <label for="entry">Entry Price</label>
+          <input id="entry" type="number" class="input" value="111500" min="0" step="0.01">
+        </div>
+        <div>
+          <label for="stop">Stop-Loss Price</label>
+          <input id="stop" type="number" class="input" value="108000" min="0" step="0.01">
+        </div>
+        <div>
+          <label for="risks">Risk % per Trade (comma-separated)</label>
+          <input id="risks" type="text" class="input" value="1,2" placeholder="e.g., 0.5, 1, 1.5, 2">
+        </div>
+      </div>
+
+      <div class="grid" style="grid-template-columns:1fr;">
+        <div>
+          <label for="tps">Take-Profits (comma-separated)</label>
+          <input id="tps" type="text" class="input" value="114500,118000,122000" placeholder="Add one or many, separated by commas">
+          <div class="row" style="margin-top:10px;gap:8px">
+            <button id="addTP" class="btn" title="Add a new TP field">Add +1% TP</button>
+            <span class="muted">Tip: You can paste prices or add with the button.</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="padding:0 22px 4px 22px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span class="pill">RR ≥ 2 preferred</span>
+        <span class="pill">Risk only 1–2%/trade</span>
+        <span class="pill danger">Never move SL away</span>
+      </div>
+
+      <div style="padding:0 22px 18px 22px">
+        <table id="results">
+          <thead>
+            <tr>
+              <th>Risk %</th>
+              <th>Risk $</th>
+              <th>Position Size (USDT)</th>
+              <th>Position Size (BTC)</th>
+              <th>Stop</th>
+              <th>TP</th>
+              <th>Potential Profit $</th>
+              <th>R:R</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div class="foot">
+        Math: position_btc = (capital * risk%) / (entry − stop). Profit = (TP − entry) × position_btc. R:R = Profit / Risk$.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id)=>document.getElementById(id);
+    const fmt = (n, d=2)=> Number(n).toLocaleString(undefined,{maximumFractionDigits:d, minimumFractionDigits:(n%1?2:0)});
+
+    function parsePercents(str){
+      return String(str)
+        .split(',')
+        .map(s=>parseFloat(s.trim()))
+        .filter(v=>!isNaN(v) && v>0)
+        .map(v=>v/100);
+    }
+    function parsePrices(str){
+      return String(str)
+        .split(',')
+        .map(s=>parseFloat(s.trim()))
+        .filter(v=>!isNaN(v) && v>0);
+    }
+
+    function calc(){
+      const capital = parseFloat($("capital").value)||0;
+      const entry = parseFloat($("entry").value)||0;
+      const stop = parseFloat($("stop").value)||0;
+      const risks = parsePercents($("risks").value);
+      const tps = parsePrices($("tps").value);
+      const riskPerCoin = entry - stop;
+
+      const tbody = $("results").querySelector('tbody');
+      tbody.innerHTML = '';
+
+      if(riskPerCoin <= 0 || entry<=0 || stop<=0){
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td colspan="8" class="danger" style="text-align:center">Invalid prices. Stop must be below Entry.</td>`;
+        tbody.appendChild(tr);
+        return;
+      }
+
+      risks.forEach(rp=>{
+        const risk$ = capital * rp;
+        const posBTC = risk$ / riskPerCoin;
+        const posUSDT = posBTC * entry;
+
+        tps.forEach(tp=>{
+          const profitPerCoin = tp - entry;
+          const profit = profitPerCoin * posBTC;
+          const rr = profit / risk$;
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${fmt(rp*100,2)}%</td>
+            <td>$${fmt(risk$,2)}</td>
+            <td>$${fmt(posUSDT,2)}</td>
+            <td>${posBTC.toFixed(6)} BTC</td>
+            <td>${fmt(stop,2)}</td>
+            <td>${fmt(tp,2)}</td>
+            <td>$${fmt(profit,2)}</td>
+            <td>${fmt(rr,2)} : 1</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      });
+    }
+
+    function addTP(){
+      const entry = parseFloat($("entry").value)||0;
+      if(!entry) return;
+      // Add an extra TP +1% above the last TP
+      const tps = parsePrices($("tps").value);
+      const last = tps.length? tps[tps.length-1] : entry*1.03;
+      const next = Math.round((last * 1.01) * 100) / 100;
+      tps.push(next);
+      $("tps").value = tps.join(',');
+      calc();
+    }
+
+    function toCSV(){
+      const rows = [['Risk %','Risk $','Position Size (USDT)','Position Size (BTC)','Stop','TP','Potential Profit $','R:R']];
+      document.querySelectorAll('#results tbody tr').forEach(tr=>{
+        const cells = [...tr.children].map(td=>td.innerText.replace(/[,$]/g,''));
+        rows.push(cells);
+      });
+      const csv = rows.map(r=>r.join(',')).join('\n');
+      const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'risk_calculator.csv';
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function reset(){
+      $("capital").value = 5000;
+      $("entry").value = 111500;
+      $("stop").value = 108000;
+      $("risks").value = '1,2';
+      $("tps").value = '114500,118000,122000';
+      calc();
+    }
+
+    // Wire up
+    ['capital','entry','stop','risks','tps'].forEach(id=>{
+      $(id).addEventListener('input', calc);
+      $(id).addEventListener('change', calc);
+    });
+    $("addTP").addEventListener('click', addTP);
+    $("download").addEventListener('click', toCSV);
+    $("reset").addEventListener('click', reset);
+
+    // Initial render
+    calc();
+  </script>
+</body>
+</html>
