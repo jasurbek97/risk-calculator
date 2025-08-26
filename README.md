@@ -2,7 +2,7 @@
 
 A comprehensive risk management tool for cryptocurrency trading that helps traders size their positions based on risk percentage rather than emotions. Available as both a web application and Android mobile app.
 
-🌐 **Live Demo**: [https://jasurbek97.github.io/trade-calculator/](https://jasurbek97.github.io/trade-calculator/)
+🌐 **Live Demo**: [https://jasurbek97.github.io/risk-calculator/](https://jasurbek97.github.io/risk-calculator/)
 
 ## 📋 Table of Contents
 
@@ -63,7 +63,7 @@ The Crypto Trade Risk Calculator is designed to help traders make informed decis
 - Internet connection (for live version)
 
 #### Quick Start
-1. **Online**: Visit [https://jasurbek97.github.io/trade-calculator/](https://jasurbek97.github.io/trade-calculator/)
+1. **Online**: Visit [https://jasurbek97.github.io/risk-calculator/](https://jasurbek97.github.io/risk-calculator/)
 2. **Local**: Download `index.html` and open in your browser
 
 #### Local Development
