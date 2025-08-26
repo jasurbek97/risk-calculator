@@ -294,51 +294,99 @@
         .filter(v=>!isNaN(v) && v>0);
     }
     
-    function autoCalculateTakeProfits(){
-      const entry = parseFloat($("entry").value)||0;
-      const stopPercent = (parseFloat($("riskdist").value)||0)/100;
-      const risks = parsePercents($("risks").value);
+    // function autoCalculateTakeProfits(){
+    //   const entry = parseFloat($("entry").value)||0;
+    //   const stopPercent = (parseFloat($("riskdist").value)||0)/100;
+    //   const risks = parsePercents($("risks").value);
       
-      if(!entry || risks.length === 0 || stopPercent <= 0) return;
+    //   if(!entry || risks.length === 0 || stopPercent <= 0) return;
       
-      // Calculate stop loss distance
-      const stopDistance = entry * stopPercent; // How much price needs to drop to hit SL
-      const stopPrice = entry - stopDistance;
+    //   // Calculate stop loss distance
+    //   const stopDistance = entry * stopPercent; // How much price needs to drop to hit SL
+    //   const stopPrice = entry - stopDistance;
       
-      // Generate take-profit levels based on proper risk-reward ratios
-      const takeProfits = [];
+    //   // Generate take-profit levels based on proper risk-reward ratios
+    //   const takeProfits = [];
       
-      risks.forEach(riskPercent => {
-        const riskPercentage = riskPercent * 100; // Convert back to percentage
+    //   risks.forEach(riskPercent => {
+    //     const riskPercentage = riskPercent * 100; // Convert back to percentage
         
-        // Define risk-reward ratios based on risk level
-        let rrRatios;
-        console.log(riskPercentage);
-        if (riskPercentage <= 1) {
-          // Conservative: Higher R:R ratios (2:1, 3:1, 4:1)
-          rrRatios = [2, 2.5, 3];
-        } else if (riskPercentage <= 2) {
-          // Moderate: Good R:R ratios (1.5:1, 2.5:1, 3.5:1)
-          rrRatios = [1.5, 2.5, 3.5];
-        } else {
-          // Aggressive: Minimum profitable R:R ratios (1:1, 2:1, 3:1)
-          rrRatios = [1.5, 2.5, 3.5];
-        }
+    //     // Define risk-reward ratios based on risk level
+    //     let rrRatios;
+    //     console.log(riskPercentage);
+    //     if (riskPercentage <= 1) {
+    //       // Conservative: Higher R:R ratios (2:1, 3:1, 4:1)
+    //       rrRatios = [2, 2.5, 3];
+    //     } else if (riskPercentage <= 2) {
+    //       // Moderate: Good R:R ratios (1.5:1, 2.5:1, 3.5:1)
+    //       rrRatios = [riskPercentage*1.5, riskPercentage*2.5, riskPercentage*3];
+    //     } else {
+    //       rrRatios = [riskPercentage*1.5, riskPercentage*2.5, riskPercentage*3];
+    //     }
         
-        // Calculate take-profit levels based on risk-reward ratios
-        rrRatios.forEach(rr => {
-          // TP = Entry + (Stop Distance × Risk:Reward Ratio)
-          const tp = Math.round(entry + (stopDistance * rr));
-          if (!takeProfits.includes(tp)) {
-            takeProfits.push(tp);
-          }
-        });
-      });
+    //     // Calculate take-profit levels based on risk-reward ratios
+    //     rrRatios.forEach(rr => {
+    //       // TP = Entry + (Stop Distance × Risk:Reward Ratio)
+    //       const tp = Math.round(entry + (stopDistance * rr));
+    //       if (!takeProfits.includes(tp)) {
+    //         takeProfits.push(tp);
+    //       }
+    //     });
+    //   });
       
-      // Sort and update the TP field
-      takeProfits.sort((a, b) => a - b);
-      $("tps").value = takeProfits.join(',');
+    //   // Sort and update the TP field
+    //   takeProfits.sort((a, b) => a - b);
+    //   $("tps").value = takeProfits.join(',');
+    // }
+
+    function autoCalculateTakeProfits() {
+  const entry = parseFloat($("entry").value) || 0;
+  let stopPercent = (parseFloat($("riskdist").value) || 0) / 100;
+  let risks = parsePercents($("risks").value);
+
+  if (!entry || risks.length === 0 || stopPercent <= 0) return;
+
+  // Enforce max risk 2%
+  risks = risks.map(r => Math.min(r, 0.02));
+
+  // Calculate stop loss distance & price
+  const stopDistance = entry * stopPercent;
+  const stopPrice = entry - stopDistance;
+
+  const takeProfits = [];
+
+  risks.forEach(riskPercent => {
+    const riskPct = riskPercent * 100; // Convert to %
+    let rrRatios = [];
+
+    // Conservative setups always enforce RR >= 2
+    if (riskPct <= 1) {
+      rrRatios = [2, 2.5, 3]; 
+    } else if (riskPct <= 2) {
+      rrRatios = [2, 2.5, 3.5]; 
+    } else {
+      rrRatios = [2, 3, 4]; 
     }
+
+    rrRatios.forEach(rr => {
+      // Ensure minimum RR = 2
+      const safeRR = Math.max(rr, 2);
+      const tp = Math.round(entry + (stopDistance * safeRR));
+
+      if (!takeProfits.includes(tp)) {
+        takeProfits.push(tp);
+      }
+    });
+  });
+
+  // Sort and output
+  takeProfits.sort((a, b) => a - b);
+  $("tps").value = takeProfits.join(',');
+
+  // Also show stop price for clarity
+  // $("sl").value = stopPrice.toFixed(2);
+}
+
 
     function calc(){
       const capital = parseFloat($("capital").value)||0;
