@@ -37,7 +37,7 @@
     @media(min-width:480px){.grid{gap:14px}}
     @media(min-width:640px){.grid{grid-template-columns:repeat(2,1fr)}}
     @media(min-width:768px){.grid{padding:0 22px 22px 22px}}
-    @media(min-width:900px){.grid{grid-template-columns:repeat(4,1fr)}}
+         @media(min-width:900px){.grid{grid-template-columns:repeat(3,1fr)}}
     
     .grid.single{grid-template-columns:1fr}
     
@@ -204,10 +204,7 @@
           <label for="entry">Entry Price</label>
           <input id="entry" type="number" class="input" value="111500" min="0" step="0.01">
         </div>
-        <div>
-          <label for="riskdist">Default Stop % Below Entry</label>
-          <input id="riskdist" type="number" class="input" value="3" min="0.1" step="0.1">
-        </div>
+        
         <div>
           <label for="risks">Risk % per Trade (comma-separated)</label>
           <input id="risks" type="text" class="input" value="1,2" placeholder="e.g., 0.5, 1, 1.5, 2">
@@ -254,7 +251,7 @@
       </div>
 
       <div class="foot">
-        <span>Stop = Entry − (Entry × stop%). Position = (capital × risk%) / (Entry − Stop).</span>
+        <span>Stop = Entry − (Entry × 3%). Position = (capital × risk%) / (Entry − Stop).</span>
         <span id="totals"></span>
       </div>
     </div>
@@ -294,108 +291,59 @@
         .filter(v=>!isNaN(v) && v>0);
     }
     
-    // function autoCalculateTakeProfits(){
-    //   const entry = parseFloat($("entry").value)||0;
-    //   const stopPercent = (parseFloat($("riskdist").value)||0)/100;
-    //   const risks = parsePercents($("risks").value);
-      
-    //   if(!entry || risks.length === 0 || stopPercent <= 0) return;
-      
-    //   // Calculate stop loss distance
-    //   const stopDistance = entry * stopPercent; // How much price needs to drop to hit SL
-    //   const stopPrice = entry - stopDistance;
-      
-    //   // Generate take-profit levels based on proper risk-reward ratios
-    //   const takeProfits = [];
-      
-    //   risks.forEach(riskPercent => {
-    //     const riskPercentage = riskPercent * 100; // Convert back to percentage
-        
-    //     // Define risk-reward ratios based on risk level
-    //     let rrRatios;
-    //     console.log(riskPercentage);
-    //     if (riskPercentage <= 1) {
-    //       // Conservative: Higher R:R ratios (2:1, 3:1, 4:1)
-    //       rrRatios = [2, 2.5, 3];
-    //     } else if (riskPercentage <= 2) {
-    //       // Moderate: Good R:R ratios (1.5:1, 2.5:1, 3.5:1)
-    //       rrRatios = [riskPercentage*1.5, riskPercentage*2.5, riskPercentage*3];
-    //     } else {
-    //       rrRatios = [riskPercentage*1.5, riskPercentage*2.5, riskPercentage*3];
-    //     }
-        
-    //     // Calculate take-profit levels based on risk-reward ratios
-    //     rrRatios.forEach(rr => {
-    //       // TP = Entry + (Stop Distance × Risk:Reward Ratio)
-    //       const tp = Math.round(entry + (stopDistance * rr));
-    //       if (!takeProfits.includes(tp)) {
-    //         takeProfits.push(tp);
-    //       }
-    //     });
-    //   });
-      
-    //   // Sort and update the TP field
-    //   takeProfits.sort((a, b) => a - b);
-    //   $("tps").value = takeProfits.join(',');
-    // }
+         function autoCalculateTakeProfits() {
+       const entry = parseFloat($("entry").value) || 0;
+       let risks = parsePercents($("risks").value);
 
-    function autoCalculateTakeProfits() {
-  const entry = parseFloat($("entry").value) || 0;
-  let stopPercent = (parseFloat($("riskdist").value) || 0) / 100;
-  let risks = parsePercents($("risks").value);
+       if (!entry || risks.length === 0) return;
 
-  if (!entry || risks.length === 0 || stopPercent <= 0) return;
+       // Enforce max risk 2%
+       risks = risks.map(r => Math.min(r, 0.02));
 
-  // Enforce max risk 2%
-  risks = risks.map(r => Math.min(r, 0.02));
+       // Fixed 3% stop loss for calculations
+       const stopPercent = 0.03;
+       const stopDistance = entry * stopPercent;
+       const takeProfits = [];
 
-  // Calculate stop loss distance & price
-  const stopDistance = entry * stopPercent;
-  const stopPrice = entry - stopDistance;
+       risks.forEach(riskPercent => {
+         const riskPct = riskPercent * 100; // Convert to %
+         let rrRatios = [];
 
-  const takeProfits = [];
+         // Conservative setups always enforce RR >= 2
+         if (riskPct <= 1) {
+           rrRatios = [2, 2.5, 3]; 
+         } else if (riskPct <= 2) {
+           rrRatios = [2, 2.5, 3.5]; 
+         } else {
+           rrRatios = [2, 3, 4]; 
+         }
 
-  risks.forEach(riskPercent => {
-    const riskPct = riskPercent * 100; // Convert to %
-    let rrRatios = [];
+         rrRatios.forEach(rr => {
+           // Ensure minimum RR = 2
+           const safeRR = Math.max(rr, 2);
+           const tp = Math.round(entry + (stopDistance * safeRR));
 
-    // Conservative setups always enforce RR >= 2
-    if (riskPct <= 1) {
-      rrRatios = [2, 2.5, 3]; 
-    } else if (riskPct <= 2) {
-      rrRatios = [2, 2.5, 3.5]; 
-    } else {
-      rrRatios = [2, 3, 4]; 
-    }
+           if (!takeProfits.includes(tp)) {
+             takeProfits.push(tp);
+           }
+         });
+       });
 
-    rrRatios.forEach(rr => {
-      // Ensure minimum RR = 2
-      const safeRR = Math.max(rr, 2);
-      const tp = Math.round(entry + (stopDistance * safeRR));
-
-      if (!takeProfits.includes(tp)) {
-        takeProfits.push(tp);
-      }
-    });
-  });
-
-  // Sort and output
-  takeProfits.sort((a, b) => a - b);
-  $("tps").value = takeProfits.join(',');
-
-  // Also show stop price for clarity
-  // $("sl").value = stopPrice.toFixed(2);
-}
+       // Sort and output
+       takeProfits.sort((a, b) => a - b);
+       $("tps").value = takeProfits.join(',');
+     }
 
 
-    function calc(){
-      const capital = parseFloat($("capital").value)||0;
-      const entry = parseFloat($("entry").value)||0;
-      const stopPercent = (parseFloat($("riskdist").value)||0)/100;
-      const stop = entry - (entry * stopPercent);
-      const risks = parsePercents($("risks").value);
-      const tps = parsePrices($("tps").value);
-      const riskPerCoin = entry - stop;
+         function calc(){
+       const capital = parseFloat($("capital").value)||0;
+       const entry = parseFloat($("entry").value)||0;
+       // Fixed 3% stop loss
+       const stopPercent = 0.03;
+       const stop = entry - (entry * stopPercent);
+       const risks = parsePercents($("risks").value);
+       const tps = parsePrices($("tps").value);
+       const riskPerCoin = entry - stop;
 
       const tbody = $("results").querySelector('tbody');
       tbody.innerHTML = '';
@@ -480,6 +428,10 @@
         rows.push(cells);
       });
 
+      // Get capital and entry price values
+      const capital = parseFloat($("capital").value) || 0;
+      const entry = parseFloat($("entry").value) || 0;
+
       // Check if warning is visible
       const riskWarning = document.getElementById('risk-warning');
       const showWarning = riskWarning && riskWarning.style.display !== 'none';
@@ -490,7 +442,7 @@
       const cellHeight = 35;
       const headerHeight = 40;
       const width = headers.length * cellWidth;
-      const height = headerHeight + (rows.length * cellHeight) + 80 + warningHeight; // Extra space for title and warning
+      const height = headerHeight + (rows.length * cellHeight) + 120 + warningHeight; // Extra space for title, parameters and warning
 
       // Create SVG
       let svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
@@ -499,6 +451,7 @@
             .header { font: 12px ui-sans-serif, system-ui; fill: #9aa7c7; font-weight: 600; }
             .cell { font: 11px ui-sans-serif, system-ui; fill: #e8ecf2; }
             .title { font: 16px ui-sans-serif, system-ui; fill: #e8ecf2; font-weight: 700; }
+            .subtitle { font: 12px ui-sans-serif, system-ui; fill: #9aa7c7; font-weight: 500; }
             .warning { font: 12px ui-sans-serif, system-ui; fill: #ff6b6b; font-weight: 600; }
             .warning-icon { font: 14px ui-sans-serif, system-ui; fill: #ff6b6b; }
             .bg { fill: #121722; }
@@ -508,16 +461,17 @@
           </style>
         </defs>
         <rect width="100%" height="100%" class="bg"/>
-        <text x="${width/2}" y="25" text-anchor="middle" class="title">Crypto Trade Risk Calculator</text>`;
+        <text x="${width/2}" y="25" text-anchor="middle" class="title">Crypto Trade Risk Calculator</text>
+        <text x="${width/2}" y="45" text-anchor="middle" class="subtitle">Capital: $${fmt(capital, 0)} USDT | Entry Price: $${fmt(entry, 2)}</text>`;
 
       // Add warning if visible
-      let tableStartY = 50;
+      let tableStartY = 70; // Start lower to account for subtitle
       if (showWarning) {
         const warningText = riskWarning.querySelector('.warning-text');
         const warningMsg = warningText ? warningText.textContent : 'Too Risky - Total Stop Loss exceeds 2% of capital';
         
         // Warning background
-        const warningY = 45;
+        const warningY = 65;
         const warningBoxWidth = width - 40;
         const warningBoxX = 20;
         svg += `<rect x="${warningBoxX}" y="${warningY}" width="${warningBoxWidth}" height="35" rx="8" class="warning-bg"/>`;
@@ -526,7 +480,7 @@
         svg += `<text x="${warningBoxX + 15}" y="${warningY + 22}" class="warning-icon">⚠️</text>`;
         svg += `<text x="${warningBoxX + 35}" y="${warningY + 22}" class="warning">${warningMsg}</text>`;
         
-        tableStartY = 90; // Move table down
+        tableStartY = 110; // Move table down further
       }
 
       // Header row
@@ -568,32 +522,31 @@
       URL.revokeObjectURL(url);
     }
 
-    function reset(){
-      $("capital").value = 5000;
-      $("entry").value = 111500;
-      $("riskdist").value = 3;
-      $("risks").value = '1,2';
-      autoCalculateTakeProfits(); // Auto-calculate TPs based on reset risk values
-      calc();
-    }
+         function reset(){
+       $("capital").value = 5000;
+       $("entry").value = 111500;
+       $("risks").value = '1,2';
+       autoCalculateTakeProfits(); // Auto-calculate TPs based on reset risk values
+       calc();
+     }
 
-    // Auto-calculate TPs when risks or entry changes
-    ['risks', 'entry'].forEach(id=>{
-      $(id).addEventListener('input', ()=>{
-        autoCalculateTakeProfits();
-        calc();
-      });
-      $(id).addEventListener('change', ()=>{
-        autoCalculateTakeProfits();
-        calc();
-      });
-    });
-    
-    // Regular calculation for other fields
-    ['capital','riskdist','tps'].forEach(id=>{
-      $(id).addEventListener('input', calc);
-      $(id).addEventListener('change', calc);
-    });
+         // Auto-calculate TPs when risks or entry changes
+     ['risks', 'entry'].forEach(id=>{
+       $(id).addEventListener('input', ()=>{
+         autoCalculateTakeProfits();
+         calc();
+       });
+       $(id).addEventListener('change', ()=>{
+         autoCalculateTakeProfits();
+         calc();
+       });
+     });
+     
+     // Regular calculation for other fields
+     ['capital','tps'].forEach(id=>{
+       $(id).addEventListener('input', calc);
+       $(id).addEventListener('change', calc);
+     });
 
     $("download").addEventListener('click', toSVG);
     $("reset").addEventListener('click', reset);
