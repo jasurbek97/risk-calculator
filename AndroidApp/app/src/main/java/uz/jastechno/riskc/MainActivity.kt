@@ -2,11 +2,15 @@ package uz.jastechno.riskc
 
 import android.annotation.SuppressLint
 import android.os.Bundle
+import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
 import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.webkit.WebViewAssetLoader
 
 class MainActivity : AppCompatActivity() {
     @SuppressLint("SetJavaScriptEnabled")
@@ -25,6 +29,23 @@ class MainActivity : AppCompatActivity() {
         webView.settings.domStorageEnabled = true
         webView.isLongClickable = false
         webView.isHapticFeedbackEnabled = false
-        webView.loadUrl("https://jasurbek97.github.io/risk-calculator/")
+        // Serve assets via https-like origin for modern web features
+        val assetLoader = WebViewAssetLoader.Builder()
+            .addPathHandler(
+                "/assets/",
+                WebViewAssetLoader.AssetsPathHandler(this) // serves from src/main/assets
+            )
+            .build()
+
+        webView.webChromeClient = WebChromeClient()
+        webView.webViewClient = object : WebViewClient() {
+            override fun shouldInterceptRequest(
+                view: WebView,
+                request: WebResourceRequest
+            ) = assetLoader.shouldInterceptRequest(request.url)
+        }
+
+        // If you copied to assets/www/index.html as above:
+        webView.loadUrl("https://appassets.androidplatform.net/assets/www/index.html")
     }
 }

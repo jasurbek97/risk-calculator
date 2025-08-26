@@ -1,3 +1,5 @@
+import org.gradle.api.tasks.Sync
+import java.io.File
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -74,4 +76,22 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+    implementation(libs.androidx.webkit)
 }
+
+val repoRoot = rootDir.parentFile ?: rootDir // handles case when AndroidApp is the Gradle root
+
+tasks.register<Sync>("copyWebToAssets") {
+    // Source: repo root
+    from(repoRoot) {
+        include("index.html")
+        // If you add folders later, include them too:
+        include("css/**", "js/**", "assets/**", "images/**")
+        exclude("AndroidApp/**", ".git/**", "README.md")
+    }
+    // Destination: app's assets
+    into(layout.projectDirectory.dir("src/main/assets/www"))
+}
+
+// Ensure assets are in place before building
+tasks.named("preBuild").configure { dependsOn("copyWebToAssets") }
