@@ -57,7 +57,15 @@ jobs:
         with:
           name: RiskCalculator-AAB
           path: AndroidApp/${{ steps.capture.outputs.aab }}
-
+       # Upload APK to GitHub Release (always overwrite latest)
+      - name: Upload APK to GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: latest
+          name: Latest Build
+          draft: false
+          prerelease: false
+          files: app/build/outputs/apk/release/app-release.apk
       # Safety net if file names differ: upload the whole output dirs
       - name: Fallback
         if: steps.capture.outputs.apk == '' && steps.capture.outputs.aab == ''
