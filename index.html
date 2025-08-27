@@ -214,7 +214,7 @@
       <div class="grid single">
         <div>
           <label for="tps">Take-Profits (comma-separated)</label>
-          <input id="tps" type="text" class="input" value="114500,118000,122000" placeholder="Add one or many, separated by commas">
+          <input id="tps" type="text" class="input" value="113730,114288,114845,115403" placeholder="Add one or many, separated by commas">
         </div>
       </div>
 
@@ -235,12 +235,12 @@
         <table id="results">
           <thead>
             <tr>
-              <th>Stop Loss %</th>
-              <th>Stop Loss $</th>
-              <th>Investment (USDT)</th>
-              <th>Investment (Crypto)</th>
-              <th>Stop Exit</th>
-              <th>Take Profit Exit</th>
+              <th>Risk %</th>
+              <th>Risk $</th>
+              <th>Deposit (USDT)</th>
+              <th>Deposit (Crypto)</th>
+              <th>Stop-Loss Exit</th>
+              <th>Take-Profit Exit</th>
               <th>Profit $</th>
               <th>R:R</th>
             </tr>
@@ -291,7 +291,7 @@
         .filter(v=>!isNaN(v) && v>0);
     }
     
-         function autoCalculateTakeProfits() {
+    function autoCalculateTakeProfits() {
        const entry = parseFloat($("entry").value) || 0;
        let risks = parsePercents($("risks").value);
 
@@ -299,7 +299,6 @@
 
        // Enforce max risk 2%
        risks = risks.map(r => Math.min(r, 0.02));
-
        // Fixed 3% stop loss for calculations
        const stopPercent = 0.03;
        const stopDistance = entry * stopPercent;
@@ -318,10 +317,11 @@
            rrRatios = [2, 3, 4]; 
          }
 
+    
          rrRatios.forEach(rr => {
            // Ensure minimum RR = 2
            const safeRR = Math.max(rr, 2);
-           const tp = Math.round(entry + (stopDistance * safeRR));
+           const tp = Math.round(entry + (entry * safeRR)/100);
 
            if (!takeProfits.includes(tp)) {
              takeProfits.push(tp);
@@ -335,7 +335,7 @@
      }
 
 
-         function calc(){
+    function calc(){
        const capital = parseFloat($("capital").value)||0;
        const entry = parseFloat($("entry").value)||0;
        // Fixed 3% stop loss
@@ -420,7 +420,7 @@
 
     function toSVG(){
       const table = document.getElementById('results');
-      const headers = ['Stop Loss %', 'Stop Loss $', 'Investment (USDT)', 'Investment (Crypto)', 'Stop Exit', 'Take Profit Exit', 'Profit $', 'R:R'];
+      const headers = ['Risk %', 'Risk $', 'Deposit (USDT)', 'Deposit (Crypto)', 'Stop-Loss Exit', 'Take-Profit Exit', 'Profit $', 'R:R'];
       const rows = [];
       
       document.querySelectorAll('#results tbody tr').forEach(tr=>{
@@ -522,7 +522,7 @@
       URL.revokeObjectURL(url);
     }
 
-         function reset(){
+    function reset(){
        $("capital").value = 5000;
        $("entry").value = 111500;
        $("risks").value = '1,2';
