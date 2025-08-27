@@ -191,7 +191,7 @@
         </div>
         <div class="row">
           <button id="reset" class="btn ghost" title="Reset to defaults">Reset</button>
-          <button id="download" class="btn accent" title="Download table as SVG">Download SVG</button>
+          <button id="download" class="btn accent" title="Download table as JPG">Download JPG</button>
         </div>
       </div>
 
@@ -418,7 +418,7 @@
 
 
 
-    function toSVG(){
+    function toJPG(){
       const table = document.getElementById('results');
       const headers = ['Risk %', 'Risk $', 'Deposit (USDT)', 'Deposit (Crypto)', 'Stop-Loss Exit', 'Take-Profit Exit', 'Profit $', 'R:R'];
       const rows = [];
@@ -437,89 +437,150 @@
       const showWarning = riskWarning && riskWarning.style.display !== 'none';
       const warningHeight = showWarning ? 50 : 0;
 
-      // SVG dimensions
+      // Canvas dimensions
       const cellWidth = 120;
       const cellHeight = 35;
       const headerHeight = 40;
       const width = headers.length * cellWidth;
-      const height = headerHeight + (rows.length * cellHeight) + 120 + warningHeight; // Extra space for title, parameters and warning
+      const height = headerHeight + (rows.length * cellHeight) + 120 + warningHeight;
 
-      // Create SVG
-      let svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <style>
-            .header { font: 12px ui-sans-serif, system-ui; fill: #9aa7c7; font-weight: 600; }
-            .cell { font: 11px ui-sans-serif, system-ui; fill: #e8ecf2; }
-            .title { font: 16px ui-sans-serif, system-ui; fill: #e8ecf2; font-weight: 700; }
-            .subtitle { font: 12px ui-sans-serif, system-ui; fill: #9aa7c7; font-weight: 500; }
-            .warning { font: 12px ui-sans-serif, system-ui; fill: #ff6b6b; font-weight: 600; }
-            .warning-icon { font: 14px ui-sans-serif, system-ui; fill: #ff6b6b; }
-            .bg { fill: #121722; }
-            .header-bg { fill: #0f1422; stroke: #1d2740; stroke-width: 1; }
-            .cell-bg { fill: #0f1422; stroke: #1d2740; stroke-width: 1; }
-            .warning-bg { fill: rgba(255,107,107,0.1); stroke: #ff6b6b; stroke-width: 2; }
-          </style>
-        </defs>
-        <rect width="100%" height="100%" class="bg"/>
-        <text x="${width/2}" y="25" text-anchor="middle" class="title">Crypto Trade Risk Calculator</text>
-        <text x="${width/2}" y="45" text-anchor="middle" class="subtitle">Capital: $${fmt(capital, 0)} USDT | Entry Price: $${fmt(entry, 2)}</text>`;
+      // Create canvas
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
 
-      // Add warning if visible
-      let tableStartY = 70; // Start lower to account for subtitle
+      // Set high DPI for crisp rendering
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+      canvas.style.width = width + 'px';
+      canvas.style.height = height + 'px';
+      ctx.scale(dpr, dpr);
+
+      // Fill background
+      ctx.fillStyle = '#121722';
+      ctx.fillRect(0, 0, width, height);
+
+      // Helper function to draw text with better positioning
+      function drawText(text, x, y, style = {}) {
+        ctx.save();
+        ctx.fillStyle = style.color || '#e8ecf2';
+        ctx.font = style.font || '11px ui-sans-serif, system-ui, sans-serif';
+        ctx.textAlign = style.align || 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, x, y);
+        ctx.restore();
+      }
+
+      // Draw title
+      drawText('Crypto Trade Risk Calculator', width/2, 25, {
+        color: '#e8ecf2',
+        font: '700 16px ui-sans-serif, system-ui, sans-serif'
+      });
+
+      // Draw subtitle
+      drawText(`Capital: $${fmt(capital, 0)} USDT | Entry Price: $${fmt(entry, 2)}`, width/2, 45, {
+        color: '#9aa7c7',
+        font: '500 12px ui-sans-serif, system-ui, sans-serif'
+      });
+
+      let tableStartY = 70;
+
+      // Draw warning if visible
       if (showWarning) {
         const warningText = riskWarning.querySelector('.warning-text');
         const warningMsg = warningText ? warningText.textContent : 'Too Risky - Total Stop Loss exceeds 2% of capital';
         
-        // Warning background
         const warningY = 65;
         const warningBoxWidth = width - 40;
         const warningBoxX = 20;
-        svg += `<rect x="${warningBoxX}" y="${warningY}" width="${warningBoxWidth}" height="35" rx="8" class="warning-bg"/>`;
+
+        // Warning background
+        ctx.fillStyle = 'rgba(255,107,107,0.1)';
+        ctx.strokeStyle = '#ff6b6b';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(warningBoxX, warningY, warningBoxWidth, 35, 8);
+        ctx.fill();
+        ctx.stroke();
+
+        // Warning text
+        drawText('⚠️', warningBoxX + 15, warningY + 17.5, {
+          color: '#ff6b6b',
+          font: '14px ui-sans-serif, system-ui, sans-serif'
+        });
         
-        // Warning icon and text
-        svg += `<text x="${warningBoxX + 15}" y="${warningY + 22}" class="warning-icon">⚠️</text>`;
-        svg += `<text x="${warningBoxX + 35}" y="${warningY + 22}" class="warning">${warningMsg}</text>`;
-        
-        tableStartY = 110; // Move table down further
+        drawText(warningMsg, warningBoxX + 35, warningY + 17.5, {
+          color: '#ff6b6b',
+          font: '600 12px ui-sans-serif, system-ui, sans-serif',
+          align: 'left'
+        });
+
+        tableStartY = 110;
       }
 
-      // Header row
+      // Draw header row
       headers.forEach((header, i) => {
         const x = i * cellWidth;
         const y = tableStartY;
-        svg += `<rect x="${x}" y="${y}" width="${cellWidth}" height="${headerHeight}" class="header-bg"/>
-                <text x="${x + cellWidth/2}" y="${y + headerHeight/2 + 4}" text-anchor="middle" class="header">${header}</text>`;
+        
+        // Header background
+        ctx.fillStyle = '#0f1422';
+        ctx.strokeStyle = '#1d2740';
+        ctx.lineWidth = 1;
+        ctx.fillRect(x, y, cellWidth, headerHeight);
+        ctx.strokeRect(x, y, cellWidth, headerHeight);
+        
+        // Header text
+        drawText(header, x + cellWidth/2, y + headerHeight/2, {
+          color: '#9aa7c7',
+          font: '600 12px ui-sans-serif, system-ui, sans-serif'
+        });
       });
 
-      // Data rows
+      // Draw data rows
       rows.forEach((row, rowIndex) => {
         const y = tableStartY + headerHeight + (rowIndex * cellHeight);
         row.forEach((cell, colIndex) => {
           const x = colIndex * cellWidth;
-          svg += `<rect x="${x}" y="${y}" width="${cellWidth}" height="${cellHeight}" class="cell-bg"/>
-                  <text x="${x + cellWidth/2}" y="${y + cellHeight/2 + 4}" text-anchor="middle" class="cell">${cell}</text>`;
+          
+          // Cell background
+          ctx.fillStyle = '#0f1422';
+          ctx.strokeStyle = '#1d2740';
+          ctx.lineWidth = 1;
+          ctx.fillRect(x, y, cellWidth, cellHeight);
+          ctx.strokeRect(x, y, cellWidth, cellHeight);
+          
+          // Cell text
+          drawText(cell, x + cellWidth/2, y + cellHeight/2, {
+            color: '#e8ecf2',
+            font: '11px ui-sans-serif, system-ui, sans-serif'
+          });
         });
       });
 
-      // Add totals at bottom
+      // Draw totals at bottom
       const totalsElement = document.getElementById('totals');
       if (totalsElement && totalsElement.innerHTML) {
         const totalsY = tableStartY + headerHeight + (rows.length * cellHeight) + 20;
-        svg += `<text x="${width/2}" y="${totalsY}" text-anchor="middle" class="header">${totalsElement.innerText}</text>`;
+        drawText(totalsElement.innerText, width/2, totalsY, {
+          color: '#9aa7c7',
+          font: '600 12px ui-sans-serif, system-ui, sans-serif'
+        });
       }
 
-      svg += '</svg>';
-
-      // Download SVG
-      const blob = new Blob([svg], {type: 'image/svg+xml;charset=utf-8'});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; 
-      a.download = 'risk_calculator.svg';
-      document.body.appendChild(a); 
-      a.click(); 
-      a.remove();
-      URL.revokeObjectURL(url);
+      // Convert canvas to JPG and download
+      canvas.toBlob((blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'risk_calculator.jpg';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      }, 'image/jpeg', 0.95); // 95% quality JPG
     }
 
     function reset(){
@@ -548,7 +609,7 @@
        $(id).addEventListener('change', calc);
      });
 
-    $("download").addEventListener('click', toSVG);
+    $("download").addEventListener('click', toJPG);
     $("reset").addEventListener('click', reset);
 
     calc();

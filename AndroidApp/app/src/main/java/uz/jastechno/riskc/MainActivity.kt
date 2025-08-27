@@ -128,17 +128,17 @@ class MainActivity : ComponentActivity() {
         webView.loadUrl("https://appassets.androidplatform.net/assets/www/index.html")
     }
 
-    /** Always name as <timestamp>.svg */
-    private fun timestampSvgName(): String = "${System.currentTimeMillis()}.svg"
+    /** Always name as <timestamp>.jpg */
+    private fun timestampJpgName(): String = "${System.currentTimeMillis()}.jpg"
 
     /** Save to Downloads/RiskCalculator (no permission on API 29+). */
-    private fun saveToDownloadsSvg(bytes: ByteArray, mime: String) {
-        val fileName = timestampSvgName()
+    private fun saveToDownloadsJpg(bytes: ByteArray, mime: String) {
+        val fileName = timestampJpgName()
         try {
             if (Build.VERSION.SDK_INT >= 29) {
                 val values = ContentValues().apply {
                     put(MediaStore.Downloads.DISPLAY_NAME, fileName)
-                    put(MediaStore.Downloads.MIME_TYPE, "image/svg+xml") // force SVG
+                    put(MediaStore.Downloads.MIME_TYPE, "image/jpeg") // force JPG
                     put(
                         MediaStore.Downloads.RELATIVE_PATH,
                         Environment.DIRECTORY_DOWNLOADS + "/RiskCalculator"
@@ -181,7 +181,7 @@ class MainActivity : ComponentActivity() {
                 URLDecoder.decode(payload, "UTF-8").toByteArray(Charsets.UTF_8)
             }
 
-            saveToDownloadsSvg(bytes, "image/svg+xml")
+            saveToDownloadsJpg(bytes, "image/jpeg")
         } catch (_: Exception) {
             toast("Invalid data URL")
         }
@@ -198,7 +198,7 @@ class MainActivity : ComponentActivity() {
                 const map = window.__blobStore || {};
                 const hit = map["$blobUrl"];
                 if (!hit || !hit.b64) return JSON.stringify({ error: "miss" });
-                return JSON.stringify({ b64: hit.b64, mime: hit.mime || "image/svg+xml" });
+                return JSON.stringify({ b64: hit.b64, mime: hit.mime || "image/jpeg" });
               } catch (e) {
                 return JSON.stringify({ error: String(e) });
               }
@@ -214,8 +214,8 @@ class MainActivity : ComponentActivity() {
                 val b64 = obj.getString("b64")
                 val bytes = android.util.Base64.decode(b64, android.util.Base64.DEFAULT)
 
-                // Force timestamp.svg filename regardless of original
-                saveToDownloadsSvg(bytes, "image/svg+xml")
+                // Force timestamp.jpg filename regardless of original
+                saveToDownloadsJpg(bytes, "image/jpeg")
             } catch (_: Exception) {
                 toast("Download failed")
             }
