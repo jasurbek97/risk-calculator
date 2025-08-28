@@ -206,28 +206,31 @@
         </div>
         
         <div>
-          <label for="risks">Risk % per Trade (comma-separated)</label>
-          <input id="risks" type="text" class="input" value="1,2" placeholder="e.g., 0.5, 1, 1.5, 2">
+          <label for="risks">Risk % per Trade (numbers only)</label>
+          <input id="risks" type="number" class="input" value="1" min="0.1" max="10" step="0.1" placeholder="Enter risk percentage (0.1-10)">
+        </div>
+        <div>
+          <label for="rrRatios">Risk-Reward Ratios (comma-separated)</label>
+          <input id="rrRatios" type="text" class="input" value="10,15,20,25,30" placeholder="e.g., 10, 15, 20, 25, 30">
+        </div>
+        <div>
+          <label for="rowCounts">Rows per Risk % (numbers only)</label>
+          <input id="rowCounts" type="number" class="input" value="5" min="1" max="100" placeholder="Enter number of rows (1-100)">
         </div>
       </div>
 
-      <div class="grid single">
-        <div>
-          <label for="tps">Take-Profits (comma-separated)</label>
-          <input id="tps" type="text" class="input" value="113730,114288,114845,115403" placeholder="Add one or many, separated by commas">
-        </div>
-      </div>
+
 
       <div class="pills">
         <span class="pill">RR ≥ 2 preferred</span>
-        <span class="pill">Risk only 1–2%/trade</span>
+        <span class="pill">Risk only 1–10%/trade</span>
         <span class="pill danger">Never move SL away</span>
       </div>
 
       <div id="risk-warning" class="risk-warning" style="display: none;">
         <div class="warning-content">
           <span class="warning-icon">⚠️</span>
-          <span class="warning-text">Too Risky - Total Stop Loss exceeds 2% of capital</span>
+          <span class="warning-text">Too Risky - Total Stop Loss exceeds 10% of capital</span>
         </div>
       </div>
 
@@ -235,6 +238,7 @@
         <table id="results">
           <thead>
             <tr>
+              <th>#</th>
               <th>Risk %</th>
               <th>Risk $</th>
               <th>Deposit (USDT)</th>
@@ -251,7 +255,7 @@
       </div>
 
       <div class="foot">
-        <span>Stop = Entry − (Entry × 3%). Position = (capital × risk%) / (Entry − Stop).</span>
+        <span>Stop = Entry − (Entry × Risk%). Position = (capital × risk%) / (Entry − Stop).</span>
         <span id="totals"></span>
       </div>
     </div>
@@ -291,47 +295,10 @@
         .filter(v=>!isNaN(v) && v>0);
     }
     
+    // This function is no longer needed since calc() generates rows directly
     function autoCalculateTakeProfits() {
-       const entry = parseFloat($("entry").value) || 0;
-       let risks = parsePercents($("risks").value);
-
-       if (!entry || risks.length === 0) return;
-
-       // Enforce max risk 2%
-       risks = risks.map(r => Math.min(r, 0.02));
-       // Fixed 3% stop loss for calculations
-       const stopPercent = 0.03;
-       const stopDistance = entry * stopPercent;
-       const takeProfits = [];
-
-       risks.forEach(riskPercent => {
-         const riskPct = riskPercent * 100; // Convert to %
-         let rrRatios = [];
-
-         // Conservative setups always enforce RR >= 2
-         if (riskPct <= 1) {
-           rrRatios = [2, 2.5, 3]; 
-         } else if (riskPct <= 2) {
-           rrRatios = [2, 2.5, 3.5]; 
-         } else {
-           rrRatios = [2, 3, 4]; 
-         }
-
-    
-         rrRatios.forEach(rr => {
-           // Ensure minimum RR = 2
-           const safeRR = Math.max(rr, 2);
-           const tp = Math.round(entry + (entry * safeRR)/100);
-
-           if (!takeProfits.includes(tp)) {
-             takeProfits.push(tp);
-           }
-         });
-       });
-
-       // Sort and output
-       takeProfits.sort((a, b) => a - b);
-       $("tps").value = takeProfits.join(',');
+       // Just trigger calc() to regenerate the table
+       calc();
      }
 
 
@@ -341,58 +308,113 @@
        // Fixed 3% stop loss
        const stopPercent = 0.03;
        const stop = entry - (entry * stopPercent);
-       const risks = parsePercents($("risks").value);
-       const tps = parsePrices($("tps").value);
+       const riskValue = parseFloat($("risks").value) || 1;
+       const risks = [riskValue / 100]; // Convert to decimal percentage
+       const rrRatiosInput = $("rrRatios").value;
+       const rowCountsInput = $("rowCounts").value;
        const riskPerCoin = entry - stop;
 
       const tbody = $("results").querySelector('tbody');
       tbody.innerHTML = '';
 
-      if(riskPerCoin <= 0 || entry<=0 || stop<=0){
+      if(entry <= 0 || riskValue <= 0){
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td colspan="8" class="danger" style="text-align:center">Invalid prices. Stop must be below Entry.</td>`;
+        tr.innerHTML = `<td colspan="9" class="danger" style="text-align:center">Invalid entry price or risk percentage.</td>`;
         tbody.appendChild(tr);
         return;
       }
 
-      // Calculate total number of rows to distribute capital
-      const totalRows = risks.length * tps.length;
+      // Parse row count from input (single number for all risks)
+      const rowCountPerRisk = parseInt(rowCountsInput) || 5;
+
+      // Parse RR ratios from input
+      let rrRatios = [];
+      if (rrRatiosInput && rrRatiosInput.trim()) {
+        rrRatios = String(rrRatiosInput)
+          .split(',')
+          .map(s => parseFloat(s.trim()))
+          .filter(v => !isNaN(v) && v > 0);
+      }
+      
+      if (rrRatios.length === 0) {
+        rrRatios = [2, 2.5, 3];
+      }
+      rrRatios = rrRatios.map(rr => Math.max(rr, 2));
+
+      // Calculate total number of rows based on row count (single risk percentage)
+      const totalRows = rowCountPerRisk;
+
       const positionSizePerRow = capital / totalRows;
       
       let totalStopLoss = 0;
       let totalProfit = 0;
 
-      risks.forEach(rp=>{
-        const risk$ = capital * rp;
-        const posBTC = positionSizePerRow / entry;  // BTC for this specific position
-        const posUSDT = positionSizePerRow;         // Equal portion of capital
+                  // Generate rows for the single risk percentage
+      const rp = risks[0]; // Single risk percentage
+      const risk$ = capital * rp;
+      
+      // Store row data to sort by take-profit later
+      const rowsData = [];
+          
+      // Generate the specified number of rows for this risk
+      for (let i = 0; i < rowCountPerRisk; i++) {
+        // Use RR ratios cyclically
+        const rrIndex = i % rrRatios.length;
+        const baseRR = rrRatios[rrIndex];
         
-        // Calculate the required stop loss for this risk level and position size
-        const requiredStop = entry - (risk$ / (capital / entry));
+        // Add variation for additional cycles
+        const cycle = Math.floor(i / rrRatios.length);
+        const adjustedRR = baseRR + (cycle * 0.8);
+        
+        // Calculate take-profit price
+        const tp = Math.round(entry + (entry * adjustedRR) / 100);
+        
+        const posBTC = positionSizePerRow / entry;
+        const posUSDT = positionSizePerRow;
+        
+        // Calculate the stop loss price: Entry - (Risk % of Entry)
+        const stopLossPrice = entry - (entry * rp); // rp is already the risk percentage as decimal
         const stopLoss = risk$ / totalRows; // Stop loss amount per position
 
-        tps.forEach(tp=>{
-          const profitPerCoin = tp - entry;
-          const profit = profitPerCoin * posBTC;
-          const rr = profit / (risk$ / totalRows); // Risk per position
-          
-          // Add to totals
-          totalStopLoss += stopLoss;
-          totalProfit += profit;
-          
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td>${fmt(rp*100,2)}%</td>
-            <td>$${fmt(stopLoss,2)}</td>
-            <td>$${fmt(posUSDT,0)}</td>
-            <td>${posBTC.toFixed(6)} </td>
-            <td>${fmt(requiredStop,2)}</td>
-            <td>${fmt(tp,2)}</td>
-            <td>$${fmt(profit,2)}</td>
-            <td>${fmt(rr,2)} : 1</td>
-          `;
-          tbody.appendChild(tr);
+        const profitPerCoin = tp - entry;
+        const profit = profitPerCoin * posBTC;
+        const rr = profit / stopLoss; // Risk per position
+        
+        // Add to totals
+        totalStopLoss += stopLoss;
+        totalProfit += profit;
+        
+        // Store row data for sorting
+        rowsData.push({
+          rp,
+          stopLoss,
+          posUSDT,
+          posBTC,
+          stopLossPrice,
+          tp,
+          profit,
+          rr
         });
+      }
+
+      // Sort rows by take-profit price (ascending)
+      rowsData.sort((a, b) => a.tp - b.tp);
+
+      // Add sorted rows to table with correct row numbers
+      rowsData.forEach((row, index) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${index + 1}</td>
+          <td>${fmt(row.rp*100,2)}%</td>
+          <td>$${fmt(row.stopLoss,2)}</td>
+          <td>$${fmt(row.posUSDT,0)}</td>
+          <td>${row.posBTC.toFixed(6)} </td>
+          <td>${fmt(row.stopLossPrice,2)}</td>
+          <td>${fmt(row.tp,2)}</td>
+          <td>$${fmt(row.profit,2)}</td>
+          <td>${row.rr % 1 === 0 ? row.rr.toFixed(0) : row.rr.toFixed(1)} : 1</td>
+        `;
+        tbody.appendChild(tr);
       });
       
       // Update totals in footer
@@ -403,14 +425,14 @@
       
       // Check if total stop loss exceeds 2% of capital and show warning
       const riskWarning = document.getElementById('risk-warning');
-      const maxAllowedRisk = capital * 0.02; // 2% of capital
+      const maxAllowedRisk = capital * 0.1; // 10% of capital
       
       if (totalStopLoss > maxAllowedRisk && capital > 0) {
         riskWarning.style.display = 'block';
         // Update warning text with specific amounts
         const warningText = riskWarning.querySelector('.warning-text');
         const excessRisk = ((totalStopLoss / capital) * 100).toFixed(1);
-        warningText.textContent = `Too Risky - Total Stop Loss (${excessRisk}%) exceeds 2% of capital`;
+        warningText.textContent = `Too Risky - Total Stop Loss (${excessRisk}%) exceeds 10% of capital`;
       } else {
         riskWarning.style.display = 'none';
       }
@@ -420,7 +442,7 @@
 
     function toJPG(){
       const table = document.getElementById('results');
-      const headers = ['Risk %', 'Risk $', 'Deposit (USDT)', 'Deposit (Crypto)', 'Stop-Loss Exit', 'Take-Profit Exit', 'Profit $', 'R:R'];
+      const headers = ['#', 'Risk %', 'Risk $', 'Deposit (USDT)', 'Deposit (Crypto)', 'Stop-Loss Exit', 'Take-Profit Exit', 'Profit $', 'R:R'];
       const rows = [];
       
       document.querySelectorAll('#results tbody tr').forEach(tr=>{
@@ -586,13 +608,15 @@
     function reset(){
        $("capital").value = 5000;
        $("entry").value = 111500;
-       $("risks").value = '1,2';
+       $("risks").value = '1';
+       $("rrRatios").value = '10,15,20,25,30';
+       $("rowCounts").value = '5';
        autoCalculateTakeProfits(); // Auto-calculate TPs based on reset risk values
        calc();
      }
 
-         // Auto-calculate TPs when risks or entry changes
-     ['risks', 'entry'].forEach(id=>{
+         // Auto-calculate TPs when risks, entry, rrRatios, or rowCounts changes
+     ['risks', 'entry', 'rrRatios', 'rowCounts'].forEach(id=>{
        $(id).addEventListener('input', ()=>{
          autoCalculateTakeProfits();
          calc();
@@ -604,7 +628,7 @@
      });
      
      // Regular calculation for other fields
-     ['capital','tps'].forEach(id=>{
+     ['capital'].forEach(id=>{
        $(id).addEventListener('input', calc);
        $(id).addEventListener('change', calc);
      });
